@@ -33,6 +33,23 @@ cli
   });
 
 cli
+  .command('add [componentName]', 'Add a new component to the library')
+  .action(async (componentName: string) => {
+    // Create a Yeoman environment
+    const env = createEnv();
+    
+    // Register the generator path and resolve the path
+    const generatorPath = path.resolve(__dirname, './generators/component');
+    env.register(require.resolve(generatorPath), {
+      namespace: 'material:component',
+      resolved: require.resolve(generatorPath)
+    });
+
+    // Run the generator with options
+    await env.run('material:component', { componentName });
+  });
+
+cli
   .command('build', 'Build components')
   .option('--watch', 'Watch mode')
   .action(async (options) => {

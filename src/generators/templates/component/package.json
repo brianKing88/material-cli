@@ -1,0 +1,32 @@
+{
+  "name": "@martirel-ui/button",
+  "version": "1.0.0",
+  "devDependencies": {},
+  "dependencies": {},
+  "peerDependencies": {
+    "@vue/composition-api": "^1.7.0",
+    "vue": "^2.5.0 || ^3.0.0",
+    "vue-demi": "latest"
+  },
+  "scripts": {},
+  "exports": {
+    ".": {
+      "types": "./dist/v3/types/index.d.ts",
+      "import": {
+        "2": "./dist/v2/index.mjs",
+        "3": "./dist/v3/index.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "2": "./dist/v2/index.js",
+        "3": "./dist/v3/index.js",
+        "default": "./dist/index.js"
+      }
+    },
+    "./style.css": "./dist/v3/index.css"
+  },
+  "files": [
+    "dist",
+    "types"
+  ]
+}
