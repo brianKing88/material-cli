@@ -1,0 +1,34 @@
+{
+  "name": "vue2-playground",
+  "version": "1.0.0",
+  "private": true,
+  "author": "ChuHoMan",
+  "license": "MIT",
+  "repository": {
+    "type": "git"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "peerDependencies": {
+    "@vue/composition-api": "^1.4.9",
+    "vue": "^2.6.0 || >=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@vue/composition-api": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@vue/composition-api": "^1.7.2",
+    "vite": "^5.4.3",
+    "vite-plugin-vue2": "^2.0.3",
+    "vue": "~2.6.14",
+    "vue-template-compiler": "~2.6.14"
+  },
+  "dependencies": {
+    "vue-demi": "^0.14.10",
+    "@martirel-ui/button": "../packages/Button"
+  }
+}

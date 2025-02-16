@@ -8,81 +8,119 @@ Material CLI 是一个用于构建 Vue 组件库的命令行工具，支持同�
 - 基于 vite 的快速构建
 - TypeScript 支持
 - 自动生成类型声明文件
-- 支持 CSS/SCSS 样式处理
+- 支持 CSS/LESS/SASS 样式处理
 - 支持组件按需加载
-- 支持组件库文档生成
 
 ## 安装
 
 ```bash
-pnpm add material-cli -D
+# 全局安装
+npm install -g material-cli
+# 或
+pnpm add -g material-cli
 ```
 
 ## 使用方法
 
-### 1. 组件目录结构
-
-组件库应遵循以下目录结构：
-
-```
-packages/
-  ├── ComponentA/
-  │   ├── src/
-  │   │   ├── index.ts        # 组件入口文件
-  │   │   └── component.vue   # 组件实现
-  │   ├── package.json        # 组件配置文件
-  │   └── material.config.ts  # 组件构建配置
-  └── ComponentB/
-      └── ...
-```
-
-### 2. 组件配置
-
-在组件目录下创建 `material.config.ts`：
-
-```typescript
-import { defineConfig } from 'material-cli'
-
-export default defineConfig({
-  name: 'component-name',
-  build: {
-    target: ['es2015'],
-    formats: ['esm', 'cjs'],
-    css: true,
-    dts: true
-  }
-})
-```
-
-### 3. 构建命令
+### 1. 初始化项目
 
 ```bash
-# 构建单个组件
-material build ComponentA
+# 创建新项目
+material init my-component-lib
 
-# 构建所有组件
-material build
-
-# 开发模式
-material dev ComponentA
+# 或在现有目录中初始化
+cd my-component-lib
+material init
 ```
 
-## 构建输出
+这将创建一个基础的组件库项目结构：
 
-每个组件会生成以下文件结构：
+```
+my-component-lib/
+├── packages/          # 组件目录
+├── example/          # 示例目录
+├── scripts/          # 构建脚本
+├── package.json
+├── tsconfig.json
+└── material.config.ts # 构建配置文件
+```
+
+### 2. 添加新组件
+
+```bash
+# 在 packages 目录下创建新组件
+material add button
+
+# 指定组件目录
+material add button --path packages/basic
+```
+
+这将创建组件基础文件结构：
+
+```
+packages/button/
+├── src/
+│   ├── index.ts        # 组件入口
+│   └── button.vue      # 组件实现
+├── style/
+│   └── index.scss      # 组件样式
+├── __tests__/          # 测试目录
+├── package.json        # 组件配置
+└── README.md          # 组件文档
+```
+
+### 3. 开发模式
+
+```bash
+# 启动开发服务器
+material dev
+
+# 指定组件开发
+material dev button
+
+# 监听模式
+material dev --watch
+```
+
+开发服务器支持：
+
+- 热更新
+- TypeScript 实时编译
+- 样式热重载
+- 组件预览
+
+### 4. 构建项目
+
+```bash
+# 构建整个组件库
+material build
+
+# 构建单个组件
+material build button
+
+# 指定构建选项
+material build --formats esm,cjs,umd --dts
+```
+
+构建输出：
 
 ```
 dist/
-  ├── v2/              # Vue 2.x 版本
-  │   ├── index.js     # CommonJS 格式
-  │   ├── index.mjs    # ES Module 格式
-  │   └── style.css    # 样式文件
-  ├── v3/              # Vue 3.x 版本
-  │   ├── index.js
-  │   ├── index.mjs
-  │   └── style.css
-  └── types/           # TypeScript 类型声明
-      └── index.d.ts
+├── v2/              # Vue 2.x 版本
+│   ├── button/
+│   │   ├── index.js     # CommonJS
+│   │   ├── index.mjs    # ES Module
+│   │   └── style.css    # 样式文件
+│   └── ...
+├── v3/              # Vue 3.x 版本
+│   ├── button/
+│   │   ├── index.js
+│   │   ├── index.mjs
+│   │   └── style.css
+│   └── ...
+└── types/           # 类型声明文件
+    └── button/
+        └── index.d.ts
 ```
 
 ## 配置选项
@@ -90,96 +128,58 @@ dist/
 ### material.config.ts
 
 ```typescript
-interface MaterialConfig {
-  // 组件名称
-  name: string;
+import { defineConfig } from 'material-cli'
+
+export default defineConfig({
+  // 组件库名称
+  name: 'my-components',
   
   // 构建配置
   build: {
     // 目标环境
-    target: string[];
+    target: ['es2015'],
     // 输出格式
-    formats: ('esm' | 'cjs' | 'umd')[];
+    formats: ['esm', 'cjs', 'umd'],
     // 是否生成 CSS 文件
-    css: boolean;
+    css: true,
     // 是否生成类型声明文件
-    dts: boolean;
-    // 自定义 vite 配置
-    viteConfig?: ViteConfig;
-  };
+    dts: true,
+    // 是否生成 sourcemap
+    sourcemap: true
+  },
   
-  // 文档配置
-  docs?: {
-    // 是否生成文档
-    enable: boolean;
-    // 文档配置选项
-    options?: object;
-  };
-}
-```
-
-## 开发指南
-
-### 1. 创建新组件
-
-```bash
-material create my-component
-```
-
-这将创建一个基础的组件模板。
-
-### 2. 开发模式
-
-```bash
-material dev my-component
-```
-
-启动开发服务器，支持热更新。
-
-### 3. 构建组件
-
-```bash
-material build my-component
-```
-
-### 4. 生成文档
-
-```bash
-material docs my-component
+  // 开发服务器配置
+  dev: {
+    port: 3000,
+    open: true
+  }
+})
 ```
 
 ## 最佳实践
 
 1. 使用 TypeScript 编写组件
-2. 遵循组件目录结构规范
-3. 编写完整的组件文档
-4. 添加单元测试
-5. 使用 CSS 预处理器（如 SCSS）管理样式
+2. 为每个组件编写测试用例
+3. 添加完整的组件文档
+4. 使用语义化版本号
+5. 遵循组件目录结构规范
 
 ## 常见问题
 
 1. **构建失败**
+
    - 检查依赖版本兼容性
    - 确保配置文件格式正确
    - 查看详细错误日志
-
 2. **类型声明问题**
+
    - 确保 TypeScript 配置正确
    - 检查类型导出是否完整
-
 3. **样式问题**
-   - 检查 CSS 预处理器配置
+
+   - 检查预处理器配置
    - 确保样式文件正确导入
-
-## 贡献指南
-
-欢迎提交 Issue 和 Pull Request。在提交之前，请：
-
-1. 确保代码通过测试
-2. 遵循代码风格规范
-3. 更新相关文档
-4. 添加必要的测试用例
 
 ## 许可证
 
-MIT 
+MIT
