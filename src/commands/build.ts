@@ -129,7 +129,7 @@ console.log('index.mjs (ESM)', isVue2);
 let mod;
 if (isVue2) {
   mod = await import('./v2/index.mjs');
-  await import('./v2/index.css');
+  await import('./v2/style.css');
 } else {
   mod = await import('./v3/index.mjs');
 }
