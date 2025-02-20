@@ -3,9 +3,11 @@ import path from 'path'
 import fs from 'fs-extra'
 import { glob } from 'glob'
 import { createViteConfig } from '../config/vite.config'
-import type { BuildOptions, MaterialConfig } from '../types'
+import type { BuildOptions, MaterialConfig, ComponentConfig } from '../types'
 import chalk from 'chalk'
 import { createJiti } from "jiti";
+
+
 
 export async function build(options: BuildOptions) {
   console.log(chalk.blue('🔍 Searching for component configurations...'));
@@ -27,6 +29,8 @@ export async function build(options: BuildOptions) {
     })
 
     console.log(chalk.green(`Found ${componentDirs.length} component(s) to build`));
+    // 缓存所有组件的配置
+    const componentMaterialConfigs = [];
 
     // 遍历所有组件目录
     for (const configPath of componentDirs) {
@@ -38,6 +42,11 @@ export async function build(options: BuildOptions) {
       try {
         const config = jiti(configPath).default as MaterialConfig
 
+        // 在组件的dist/目录下生成material.config.json文件
+        // -- 去除关于build的配置
+        const config_ = { ...config, build: undefined };
+        // -- 缓存所有组件的配置
+        componentMaterialConfigs.push(config_);
         // Build for Vue 2
         console.log(chalk.cyan('\n🔨 Building for Vue 2...'))
         const vue2Config = await createViteConfig({
@@ -47,8 +56,9 @@ export async function build(options: BuildOptions) {
           outDir: 'dist/v2',
           mode: 'production'
         })
+        // 
         await viteBuild(vue2Config)
-        console.log(chalk.green('✅ Vue 2 build completed'))
+        console.log(chalk.green(`✅ Vue 2 build ${componentName} completed`))
 
         // Build for Vue 3
         console.log(chalk.cyan('\n🔨 Building for Vue 3...'))
@@ -67,12 +77,16 @@ export async function build(options: BuildOptions) {
           mode: 'production'
         })
         await viteBuild(vue3Config)
-        console.log(chalk.green('✅ Vue 3 build completed'))
+        console.log(chalk.green(`✅ Vue 3 build ${componentName} completed`))
 
         // 生成入口文件
         console.log(chalk.cyan('\n📝 生成入口文件...'))
         await generateEntryFiles(componentDir)
         console.log(chalk.green('✅ 入口文件生成完成'))
+
+        // 生成material.config.json文件
+        await fs.writeFile(path.join(componentDir, 'dist/material.config.json'), JSON.stringify(config_, null, 2))
+        console.log(chalk.green(`✅ material.config.json file generated for ${componentName}`))
 
         if (options.watch) {
           console.log(chalk.yellow('👀 启用监听模式'))
@@ -108,12 +122,317 @@ export async function build(options: BuildOptions) {
         }
       }
     }
+    console.log(chalk.green('\n🎉 All components built successfully!'));
+    // 构建全量包
+    await buildFullPackage(cwd, componentMaterialConfigs);
   } catch (error: unknown) {
     console.error(chalk.red('\n❌ Build failed with error:'), error);
     console.error(chalk.red('Error stack:'), (error as Error).stack);
     process.exit(1);
   }
 }
+
+// 拆分成以下几个方法
+async function buildFullPackage(cwd: string, componentConfigs: ComponentConfig[]) {
+  console.log(chalk.blue('\n📦 Building full package...'));
+
+  try {
+    // 1. 准备全量包的构建目录
+    await prepareFullPackageDir(cwd);
+
+    // 2. 生成入口文件
+    await generateFullPackageEntry(cwd, componentConfigs);
+
+    // 3. 生成 package.json
+    await generateFullPackageJson(cwd, componentConfigs);
+
+    // 4. 构建全量包
+    await buildFullPackageBundle(cwd, componentConfigs);
+
+    // 5. 生成material.index.json文件
+    await generateMaterialIndexJson(cwd, componentConfigs);
+
+    console.log(chalk.green('✅ Full package built successfully!'));
+  } catch (error) {
+    console.error(chalk.red('❌ Failed to build full package:'), error);
+    throw error;
+  }
+}
+
+async function prepareFullPackageDir(cwd: string) {
+  // 在根目录下创建dist目录
+  const fullPackageDir = path.join(cwd, 'dist');
+  await fs.ensureDir(fullPackageDir);
+  return fullPackageDir;
+}
+
+async function generateFullPackageEntry(cwd: string, componentConfigs: ComponentConfig[]) {
+  const fullPackageDir = path.join(cwd, '');
+  // const rootPackageJson = await fs.readJson(path.join(cwd, 'package.json'));
+  
+  // 1. 生成主入口文件 (index.ts)
+  const mainEntryContent = `
+import type { App } from 'vue-demi'
+
+// 导出所有组件
+export * from './components'
+// 导出全量包
+export { default } from './bundle'
+// 导出工具函数
+export * from './utils'
+`;
+
+  // 2. 生成组件导出文件 (components.ts)
+  const componentsContent = `
+// 按需导出各个组件
+${componentConfigs.map(config => 
+  `export { default as ${config.name} } from './components/${config.name.toLowerCase()}'`
+).join('\n')}
+`;
+
+  // 3. 生成全量包文件 (bundle.ts)
+  const bundleContent = `
+import type { App } from 'vue-demi'
+${componentConfigs.map(config => 
+  `import ${config.name} from './components/${config.name.toLowerCase()}'`
+).join('\n')}
+
+// 组件列表
+const components = [
+  ${componentConfigs.map(config => config.name).join(',\n  ')}
+]
+
+// 全量安装函数
+export function install(app: App) {
+  components.forEach(component => {
+    app.use(component)
+  })
+}
+
+export default {
+  install,
+  ${componentConfigs.map(config => config.name).join(',\n  ')}
+}
+`;
+
+  // 4. 生成类型定义文件 (index.d.ts)
+  const typesContent = `
+import type { App } from 'vue-demi'
+
+export function install(app: App): void
+
+${componentConfigs.map(config => 
+  `export { ${config.name}, ${config.name}Props } from './components/${config.name.toLowerCase()}'`
+).join('\n')}
+
+declare const _default: {
+  install: typeof install;
+  ${componentConfigs.map(config => 
+    `${config.name}: typeof ${config.name};`
+  ).join('\n  ')}
+}
+export default _default
+`;
+
+  // 创建目录结构
+  await fs.ensureDir(path.join(fullPackageDir, 'src'));
+  await fs.ensureDir(path.join(fullPackageDir, 'src/components'));
+  await fs.ensureDir(path.join(fullPackageDir, 'src/utils'));
+
+  // 写入文件
+  await fs.writeFile(path.join(fullPackageDir, 'src/index.ts'), mainEntryContent);
+  await fs.writeFile(path.join(fullPackageDir, 'src/components.ts'), componentsContent);
+  await fs.writeFile(path.join(fullPackageDir, 'src/bundle.ts'), bundleContent);
+  await fs.writeFile(path.join(fullPackageDir, 'src/index.d.ts'), typesContent);
+}
+
+async function generateFullPackageJson(cwd: string, componentConfigs: ComponentConfig[]) {
+  const fullPackageDir = path.join(cwd, 'dist');
+  const rootPackageJson = await fs.readJson(path.join(cwd, 'package.json'));
+
+  const fullPackageJson = {
+    name: rootPackageJson.name,
+    version: rootPackageJson.version,
+    description: rootPackageJson.description,
+    main: 'dist/index.js',
+    module: 'dist/index.mjs',
+    types: 'dist/index.d.ts',
+    exports: {
+      '.': {
+        types: './dist/index.d.ts',
+        import: './dist/index.mjs',
+        require: './dist/index.js'
+      },
+      './bundle': {
+        types: './dist/bundle.d.ts',
+        import: './dist/bundle.mjs',
+        require: './dist/bundle.js'
+      },
+      './components': {
+        types: './dist/components.d.ts',
+        import: './dist/components.mjs',
+        require: './dist/components.js'
+      },
+      // 为每个组件添加子路径导出
+      ...Object.fromEntries(
+        componentConfigs.map(config => [
+          `./components/${config.name.toLowerCase()}`,
+          {
+            types: `./dist/components/${config.name.toLowerCase()}/index.d.ts`,
+            import: `./dist/components/${config.name.toLowerCase()}/index.mjs`,
+            require: `./dist/components/${config.name.toLowerCase()}/index.js`,
+            style: `./dist/components/${config.name.toLowerCase()}/style/index.css`
+          }
+        ])
+      )
+    },
+    files: [
+      'dist',
+      'README.md'
+    ],
+    sideEffects: [
+      "**/*.css",
+      "**/*.scss",
+      "./dist/bundle.js",
+      "./dist/bundle.mjs"
+    ],
+    peerDependencies: {
+      'vue': '^2.6.0 || ^3.0.0',
+      'vue-demi': '^0.14.0'
+    },
+    publishConfig: {
+      access: 'public'
+    }
+  };
+
+  await fs.writeFile(
+    path.join(fullPackageDir, 'package.json'),
+    JSON.stringify(fullPackageJson, null, 2)
+  );
+}
+
+async function buildFullPackageBundle(cwd: string, componentConfigs: ComponentConfig[]) {
+  const fullPackageDir = path.join(cwd, 'dist');
+  const rootPackageJson = await fs.readJson(path.join(cwd, 'package.json'));
+  
+  // 1. 复制各个组件的打包产物
+  for (const config of componentConfigs) {
+    const componentName = config.name.toLowerCase();
+    const srcDir = path.join(cwd, `packages/${componentName}/dist`);
+    const destDir = path.join(fullPackageDir, `components/${componentName}`);
+    
+    // 复制组件的构建产物
+    await fs.copy(srcDir, destDir, {
+      filter: (src) => {
+        // 排除不需要的文件
+        return !src.includes('material.config.json') && 
+               !src.includes('v2') && 
+               !src.includes('v3');
+      }
+    });
+  }
+
+  // 2. 生成入口文件
+  // index.js (CommonJS)
+  const indexJs = `
+'use strict';
+const { isVue2 } = require('vue-demi');
+
+const components = {};
+${componentConfigs.map(config => `
+components.${config.name} = require('./components/${config.name.toLowerCase()}').default;`).join('')}
+
+module.exports = {
+  install(app) {
+    Object.values(components).forEach(component => {
+      app.use(component);
+    });
+  },
+  ...components
+};
+`;
+
+  // index.mjs (ESM)
+  const indexMjs = `
+import { isVue2 } from 'vue-demi';
+${componentConfigs.map(config => 
+  `import ${config.name} from './components/${config.name.toLowerCase()}';`
+).join('\n')}
+
+export {
+  ${componentConfigs.map(config => config.name).join(',\n  ')}
+};
+
+export function install(app) {
+  [${componentConfigs.map(config => config.name).join(', ')}].forEach(component => {
+    app.use(component);
+  });
+}
+
+export default {
+  install,
+  ${componentConfigs.map(config => config.name).join(',\n  ')}
+};
+`;
+
+  // index.d.ts
+  const indexDts = `
+import type { App } from 'vue-demi';
+
+export function install(app: App): void;
+
+${componentConfigs.map(config => 
+  `export { default as ${config.name} } from './components/${config.name.toLowerCase()}';`
+).join('\n')}
+
+declare const _default: {
+  install: typeof install;
+  ${componentConfigs.map(config => 
+    `${config.name}: typeof ${config.name};`
+  ).join('\n  ')}
+};
+
+export default _default;
+`;
+
+  // 写入入口文件
+  await fs.writeFile(path.join(fullPackageDir, 'index.js'), indexJs);
+  await fs.writeFile(path.join(fullPackageDir, 'index.mjs'), indexMjs);
+  await fs.writeFile(path.join(fullPackageDir, 'index.d.ts'), indexDts);
+
+  /* 暂时注释掉 UMD 模块构建... */
+
+  // 3. 生成样式入口文件
+  const styleEntryContent = componentConfigs
+    .map(config => `import './components/${config.name.toLowerCase()}/style/index.css';`)
+    .join('\n');
+  
+  await fs.writeFile(
+    path.join(fullPackageDir, 'style.js'),
+    styleEntryContent
+  );
+}
+
+async function generateMaterialIndexJson(cwd: string, componentConfigs: any[]) {
+  const packageJson = await fs.readJson(path.join(cwd, 'package.json'))
+  // 在根目录下/dist/目录下生成material.json文件
+  const repoInfo = {
+    code: packageJson?.material?.code,
+    name: packageJson?.material?.name,
+    npmName: packageJson.name,
+    version: packageJson.version,
+    description: packageJson.description,
+    image: packageJson.material?.image,
+    gitUrl: packageJson.material?.gitUrl
+  }
+  const indexConfig = {
+    repoInfo,
+    components: componentConfigs
+  }
+  // 
+  await fs.writeFile(path.join(cwd, 'dist/material.json'), JSON.stringify(indexConfig, null, 2))
+}
+
 
 async function generateEntryFiles(componentDir: string) {
   const indexJs = `

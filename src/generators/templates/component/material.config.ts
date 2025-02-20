@@ -1,9 +1,8 @@
-// import { defineConfig } from 'material-cli'
 export default {
   // 基础信息
-  name: 'Button',
-  title: '按钮',
-  description: '按钮组件',
+  name: '<%= ComponentName %>', // 组件名称
+  title: '按钮', // 组件中文名
+  description: '按钮组件', // 组件描述
   category: '基础组件', // 组件标签
   status: 'stable', // 组件状态
   id: 'button', // 唯一id
@@ -13,9 +12,9 @@ export default {
   icon: 'https://vue-demi.gitee.io/vue-demi/zh/components/Button.html',
   group: '基础组件',
   priority: 1,
-  keywords: ['按钮', 'button'],
+  keywords: ['按钮', 'button'], // 组件关键词 搜索使用
   version: '1.0.0',
-  package: 'button',
+  package: 'button', // 组件包名
 
   // 构建配置
   build: {

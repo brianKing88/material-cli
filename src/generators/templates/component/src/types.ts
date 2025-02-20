@@ -1,13 +1,9 @@
-export type ButtonType = 'primary' | 'success' | 'warning' | 'danger' | 'info';
-export type ButtonSize = 'small' | 'medium' | 'large';
-
-export interface ButtonProps {
-  type?: ButtonType;
-  size?: ButtonSize;
-  disabled?: boolean;
-  round?: boolean;
+export interface <%= ComponentName %>Props {
+  /**
+   * Whether the component is disabled
+   * @default false
+   */
+  disabled?: boolean
 }
 
-export interface ButtonEmits {
-  (e: 'click', event: MouseEvent): void;
-}
+export type <%= ComponentName %>Instance = InstanceType<typeof <%= ComponentName %>>
