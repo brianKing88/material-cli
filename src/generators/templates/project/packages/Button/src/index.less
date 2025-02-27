@@ -1,0 +1,100 @@
+.v-button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 8px 15px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  color: #606266;
+  text-align: center;
+  white-space: nowrap;
+  background: #fff;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  outline: none;
+  transition: .1s;
+  cursor: pointer;
+  user-select: none;
+  -webkit-appearance: none;
+
+  &:hover,
+  &:focus {
+    color: #409eff;
+    border-color: #c6e2ff;
+    background-color: #ecf5ff;
+  }
+
+  &:active {
+    color: #3a8ee6;
+    border-color: #3a8ee6;
+    outline: none;
+  }
+
+  &.is-round {
+    border-radius: 20px;
+  }
+
+  &.is-disabled {
+    color: #c0c4cc;
+    cursor: not-allowed;
+    background-image: none;
+    background-color: #fff;
+    border-color: #ebeef5;
+
+    &:hover,
+    &:focus,
+    &:active {
+      color: #c0c4cc;
+      background-color: #fff;
+      border-color: #ebeef5;
+    }
+  }
+
+  // 类型样式
+  &--primary {
+    color: #fff;
+    background-color: #409eff;
+    border-color: #409eff;
+
+    &:hover,
+    &:focus {
+      background: #66b1ff;
+      border-color: #66b1ff;
+      color: #fff;
+    }
+
+    &:active {
+      background: #3a8ee6;
+      border-color: #3a8ee6;
+      color: #fff;
+    }
+  }
+
+  // 尺寸
+  &--medium {
+    height: 36px;
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+
+  &--small {
+    height: 28px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  &--large {
+    height: 40px;
+    padding: 12px 24px;
+    font-size: 16px;
+  }
+
+  &--mini {
+    height: 24px;
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+} 

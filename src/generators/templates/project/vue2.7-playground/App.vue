@@ -4,7 +4,7 @@ import Button from '../packages/Button/src/Button.vue'
 export default defineComponent({
   name: 'App',
   components: {
-    VButton: Button,
+    VButton: Button
   },
   setup() {
     const vueVersion = ref(isVue2 ? 'Vue2' : 'Vue3');

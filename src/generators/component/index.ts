@@ -32,6 +32,20 @@ module.exports = class extends Generator {
 
   writing() {
     const componentName = this.options.componentName || this.answers.componentName;
+    const packagesDir = this.destinationPath('packages');
+    
+    // 检查 packages 目录是否存在
+    if (!fs.existsSync(packagesDir)) {
+      this.log(chalk.red('❌ Error: packages directory not found.'));
+      this.log(chalk.yellow('Please create the packages directory first:'));
+      this.log(chalk.blue('\n  mkdir packages\n'));
+      this.log(chalk.yellow('Then run the command again:'));
+      this.log(chalk.blue(`  material add ${componentName}\n`));
+      // 终止生成器执行
+      process.exit(1);
+      return;
+    }
+    
     const templatePath = path.join(__dirname, '../../../src/generators/templates/component');
     const destinationPath = this.destinationPath(`packages/${componentName}`);
 
@@ -77,6 +91,27 @@ module.exports = class extends Generator {
       templateVars
     );
 
+    // 复制 README.md 文件
+    this.fs.copyTpl(
+      `${templatePath}/README.md`,
+      path.join(destinationPath, 'README.md'),
+      templateVars
+    );
+
+    // 复制 CHANGELOG.md 文件
+    this.fs.copyTpl(
+      `${templatePath}/CHANGELOG.md`,
+      path.join(destinationPath, 'CHANGELOG.md'),
+      templateVars
+    );
+
+    // 复制 demo 目录
+    this.fs.copyTpl(
+      `${templatePath}/demo/**/*`,
+      path.join(destinationPath, 'demo'),
+      templateVars
+    );
+
     // 复制并重命名组件文件
     this.fs.copyTpl(
       `${templatePath}/src/component.vue`,
@@ -93,6 +128,13 @@ module.exports = class extends Generator {
     this.fs.copyTpl(
       `${templatePath}/src/types.ts`,
       path.join(destinationPath, 'src/types.ts'),
+      templateVars
+    );
+
+    // 复制 Less 样式文件
+    this.fs.copyTpl(
+      `${templatePath}/src/index.less`,
+      path.join(destinationPath, 'src/index.less'),
       templateVars
     );
 
