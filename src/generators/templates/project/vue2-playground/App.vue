@@ -1,11 +1,11 @@
 <script lang="ts">
 import { defineComponent, isVue2, isVue3, ref } from 'vue-demi';
-import VButton from '../packages/Button/src/Button.vue'
+import Button from '../packages/Button/src/Button.vue'
 
 export default defineComponent({
   name: 'App',
   components: {
-    VButton: VButton,
+    VButton: Button
   },
   setup() {
     const vueVersion = ref(isVue2 ? 'Vue2' : 'Vue3');

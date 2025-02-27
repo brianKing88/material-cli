@@ -48,17 +48,31 @@ cli
   });
 
 cli
-  .command('dev', 'Start development server')
+  .command('dev [componentName]', 'Start development server')
   .option('--component <component>', 'Component to develop')
   .option('--vue-version <version>', 'Vue version (2, 2.7 or 3)')
+  .option('--vue-versions <versions>', 'Multiple Vue versions for sync mode (comma-separated list)')
+  .option('--sync', 'Enable synchronized development across multiple Vue versions')
   .option('--watch', 'Watch mode')
   .option('--mode <mode>', 'Development mode (playground or docs)')
   .option('--all', 'Develop all components')
   .option('--last', 'Use the last component')
-  .action(async (options) => {
+  .action(async (componentName, options) => {
     // 设置默认值
     options.vueVersion = options.vueVersion || '3';
     options.mode = options.mode || 'playground';
+    
+    // 如果位置参数提供了组件名称，优先使用位置参数
+    if (componentName) {
+      options.component = componentName;
+    }
+    
+    // Handle vue-versions option
+    if (options.vueVersions) {
+      if (typeof options.vueVersions === 'string') {
+        options.vueVersions = options.vueVersions.split(',').map((v: string) => v.trim());
+      }
+    }
     
     await dev(options);
   });

@@ -1,6 +1,5 @@
 <script lang="ts">
 import { defineComponent, isVue2, isVue3, ref } from 'vue-demi';
-// import Button from '@martirel-ui/button';
 import Button from '../packages/Button/src/Button.vue'
 export default defineComponent({
   name: 'App',
@@ -32,7 +31,6 @@ export default defineComponent({
     <h1>{{ vueVersion }}Version </h1>
     <h2>Button 组件示例</h2>
     <div class="demo-button">
-      <!-- <button></button> -->
       <v-button type="primary" @click="handleClick">主要按钮</v-button>
       <v-button>默认按钮</v-button>
       <v-button type="success">成功按钮</v-button>

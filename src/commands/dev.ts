@@ -14,6 +14,8 @@ interface DevOptions {
   mode?: 'playground' | 'docs'
   all?: boolean
   last?: boolean
+  sync?: boolean
+  vueVersions?: ('2' | '2.7' | '3')[]
 }
 
 interface PlaygroundConfig {
@@ -83,6 +85,7 @@ class DevServer {
   private docsDir: string
   private templateDir: string
   private devHistory: DevHistory
+  private syncServers: Map<string, any> = new Map() // Store servers for each Vue version
 
   constructor(options: DevOptions) {
     this.cwd = process.cwd()
@@ -425,8 +428,8 @@ new Vue({
   <div class="app">
     <h1>${component} 组件开发</h1>
     <div class="demo-container">
-      <!-- 在这里添加组件示例 -->
-      <p>开始开发 ${component} 组件</p>
+      <!-- 组件使用示例 -->
+      <${component.toLowerCase()}></${component.toLowerCase()}>
     </div>
   </div>
 </template>
@@ -435,14 +438,23 @@ new Vue({
 ${isVue3 
   ? `
 import { defineComponent } from 'vue'
+import ${component} from '../src/${component}.vue'
 
 export default defineComponent({
-  name: 'App'
+  name: 'App',
+  components: {
+    ${component}
+  }
 })
   `.trim()
   : `
+import ${component} from '../src/${component}.vue'
+
 export default {
-  name: 'App'
+  name: 'App',
+  components: {
+    ${component}
+  }
 }
   `.trim()}
 </script>
@@ -533,11 +545,14 @@ export default {
     return server
   }
 
-  private async linkComponent(component: string) {
+  private async linkComponent(component: string, targetPlayground?: string) {
+    // Use the specified playground directory or the default one
+    const playgroundDir = targetPlayground || this.playgroundDir;
+    
     const packagesDir = path.join(this.cwd, 'packages')
     const componentLinks = []
 
-    // 如果指定了组件，只链接该组件
+    // If a component is specified, only link that one
     if (component) {
       const componentDir = path.join(packagesDir, component)
       if (!fs.existsSync(componentDir)) {
@@ -549,7 +564,7 @@ export default {
         componentLinks.push(componentPkg)
       }
     } else {
-      // 链接所有组件
+      // Link all components
       const components = await this.getAvailableComponents()
       for (const comp of components) {
         const componentPkg = await this.getComponentPackageInfo(comp)
@@ -559,46 +574,51 @@ export default {
       }
     }
 
-    // 更新 playground 的 package.json
-    const playgroundPkgPath = path.join(this.playgroundDir, 'package.json')
+    // Update playground's package.json
+    const playgroundPkgPath = path.join(playgroundDir, 'package.json')
     const playgroundPkg = await fs.readJson(playgroundPkgPath)
 
-    // 确保 dependencies 对象存在
+    // Ensure dependencies object exists
     if (!playgroundPkg.dependencies) {
       playgroundPkg.dependencies = {}
     }
 
-    // 添加组件依赖
+    // Add component dependencies
     for (const comp of componentLinks) {
-      playgroundPkg.dependencies[comp.name] = `file:${path.relative(this.playgroundDir, comp.path)}`
+      playgroundPkg.dependencies[comp.name] = `file:${path.relative(playgroundDir, comp.path)}`
     }
 
     await fs.writeJson(playgroundPkgPath, playgroundPkg, { spaces: 2 })
 
-    // 重新安装依赖以链接组件
-    console.log(chalk.blue('📦 链接组件中...'))
-    await this.installDependencies(this.playgroundDir)
+    // Reinstall dependencies to link components
+    console.log(chalk.blue(`📦 链接组件到 ${path.basename(playgroundDir)}...`))
+    await this.installDependencies(playgroundDir)
 
-    // 打印链接的组件信息
+    // Print linked components info
     console.log(chalk.green('\n📦 已链接组件:'))
     for (const comp of componentLinks) {
-      console.log(chalk.blue(`  - ${comp.name} (${comp.importPath})`))
+      // 添加提示信息，显示引用方式
+      const importMode = comp.sourcePath !== comp.importPath 
+        ? chalk.yellow(' (直接引用源码)') 
+        : ' (包名引用)'
+      console.log(chalk.blue(`  - ${comp.name}${importMode}`))
     }
 
-    // 如果指定了组件，更新 App.vue 文件
+    // If a component is specified, update App.vue file
     if (component && componentLinks.length > 0) {
-      await this.updatePlaygroundAppVue(component, componentLinks[0])
+      await this.updatePlaygroundAppVue(component, componentLinks[0], playgroundDir)
     }
   }
 
-  /**
-   * 更新 playground 的 App.vue 文件，引入指定组件
-   */
-  private async updatePlaygroundAppVue(componentName: string, componentInfo: any) {
-    const appVuePath = path.join(this.playgroundDir, 'App.vue')
+  // Updated method to support custom playground directory
+  private async updatePlaygroundAppVue(componentName: string, componentInfo: any, targetPlayground?: string) {
+    // Use the specified playground directory or the default one
+    const playgroundDir = targetPlayground || this.playgroundDir;
+
+    const appVuePath = path.join(playgroundDir, 'App.vue')
     
     if (!fs.existsSync(appVuePath)) {
-      console.warn(chalk.yellow(`警告: ${this.playgroundDir}/App.vue 文件不存在`))
+      console.warn(chalk.yellow(`警告: ${playgroundDir}/App.vue 文件不存在`))
       return
     }
 
@@ -608,9 +628,14 @@ export default {
       
       // 组件名首字母大写
       const ComponentName = componentName.charAt(0).toUpperCase() + componentName.slice(1)
+      // 获取kebab-case形式的组件名称
+      const kebabCaseName = componentName.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '')
+      
+      // 使用sourcePath (直接引用源文件) 或 importPath (包名引用)
+      const importPathToUse = componentInfo.sourcePath || componentInfo.importPath
       
       // 检查是否已经导入了该组件
-      const importRegex = new RegExp(`import\\s+.*?from\\s+['"]${componentInfo.importPath}['"]`)
+      const importRegex = new RegExp(`import\\s+.*?from\\s+['"](${componentInfo.importPath}|${componentInfo.sourcePath || ''})['"]`)
       const componentRegex = new RegExp(`components:\\s*{[^}]*${ComponentName}[^}]*}`)
       
       // 如果没有导入该组件，添加导入语句
@@ -624,8 +649,8 @@ export default {
             const lastImport = importMatch[importMatch.length - 1]
             const lastImportIndex = appVueContent.lastIndexOf(lastImport) + lastImport.length
             
-            // 添加新的导入语句
-            const newImport = `\nimport ${ComponentName} from '${componentInfo.importPath}';`
+            // 添加新的导入语句，使用直接路径
+            const newImport = `\nimport ${ComponentName} from '${importPathToUse}';`
             appVueContent = appVueContent.slice(0, lastImportIndex) + newImport + appVueContent.slice(lastImportIndex)
           }
         }
@@ -640,9 +665,14 @@ export default {
           const componentsContent = componentsMatch[1]
           const componentsEndIndex = appVueContent.indexOf(componentsMatch[0]) + componentsMatch[0].length
           
-          // 替换 components 对象
-          const newComponentsObj = `components: {${componentsContent}${componentsContent.trim() ? ',' : ''}
-    ${ComponentName},
+          // 替换 components 对象，使用kebab-case的组件名称
+          const tagName = kebabCaseName.includes('-') ? kebabCaseName : `v-${kebabCaseName}`;
+          
+          // 清理现有内容，移除多余的逗号
+          const cleanedContent = componentsContent.trim().replace(/,\s*$/, '');
+          
+          const newComponentsObj = `components: {${cleanedContent ? `${cleanedContent},` : ''}
+    '${tagName}': ${ComponentName}
   }`
           
           appVueContent = appVueContent.replace(/components:\s*{([^}]*)}/s, newComponentsObj)
@@ -653,8 +683,9 @@ export default {
             const setupIndex = appVueContent.indexOf(setupMatch[0])
             
             // 添加 components 对象
+            const tagName = kebabCaseName.includes('-') ? kebabCaseName : `v-${kebabCaseName}`;
             const newComponents = `  components: {
-    ${ComponentName},
+    '${tagName}': ${ComponentName}
   },
   `
             
@@ -664,7 +695,7 @@ export default {
       }
       
       // 添加组件使用示例
-      if (!appVueContent.includes(`<${ComponentName.toLowerCase()}`)) {
+      if (!appVueContent.includes(`<${kebabCaseName}`) && !appVueContent.includes(`<v-${kebabCaseName}`)) {
         // 查找 template 标签内容
         const templateMatch = appVueContent.match(/<template>([\s\S]*?)<\/template>/s)
         if (templateMatch) {
@@ -676,15 +707,17 @@ export default {
             const demoSection = demoSectionMatch[0]
             const demoSectionIndex = templateContent.indexOf(demoSection) + demoSection.length
             
-            // 添加组件示例
-            const componentExample = `\n      <${ComponentName.toLowerCase()}></${ComponentName.toLowerCase()}>`
+            // 添加组件示例，使用与注册相同的标签名
+            const tagName = kebabCaseName.includes('-') ? kebabCaseName : `v-${kebabCaseName}`;
+            const componentExample = `\n      <${tagName}></${tagName}>`
             
             appVueContent = appVueContent.replace(templateContent, 
               templateContent.slice(0, demoSectionIndex) + componentExample + templateContent.slice(demoSectionIndex)
             )
           } else {
             // 如果没有 demo 区域，在 template 末尾添加
-            const newDemoSection = `\n  <div class="demo-${componentName.toLowerCase()}">\n    <${ComponentName.toLowerCase()}></${ComponentName.toLowerCase()}>\n  </div>`
+            const tagName = kebabCaseName.includes('-') ? kebabCaseName : `v-${kebabCaseName}`;
+            const newDemoSection = `\n  <div class="demo-${componentName.toLowerCase()}">\n    <${tagName}></${tagName}>\n  </div>`
             
             appVueContent = appVueContent.replace(templateContent, templateContent + newDemoSection)
           }
@@ -693,15 +726,20 @@ export default {
       
       // 写回文件
       await fs.writeFile(appVuePath, appVueContent, 'utf-8')
-      console.log(chalk.green(`✅ 已更新 ${this.playgroundDir}/App.vue 文件，引入 ${ComponentName} 组件`))
+      console.log(chalk.green(`✅ 已更新 ${playgroundDir}/App.vue 文件，引入 ${ComponentName} 组件`))
     } catch (error) {
-      console.warn(chalk.yellow(`警告: 无法更新 ${this.playgroundDir}/App.vue 文件`), error)
+      console.warn(chalk.yellow(`警告: 无法更新 ${playgroundDir}/App.vue 文件`), error)
     }
   }
 
   private async getComponentPackageInfo(component: string) {
     const componentDir = path.join(this.cwd, 'packages', component)
     const pkgPath = path.join(componentDir, 'package.json')
+    const srcDir = path.join(componentDir, 'src')
+    const componentFile = path.join(srcDir, `${component}.vue`)
+
+    // 检查组件文件是否存在
+    const isComponentFileExists = fs.existsSync(componentFile)
 
     if (!fs.existsSync(pkgPath)) {
       console.warn(chalk.yellow(`警告: 组件 "${component}" 没有 package.json 文件`))
@@ -710,10 +748,17 @@ export default {
 
     try {
       const pkg = await fs.readJson(pkgPath)
+      
+      // 为开发阶段添加直接引用源文件的路径
+      const sourcePath = isComponentFileExists 
+        ? `../packages/${component}/src/${component}.vue`
+        : pkg.name
+        
       return {
         name: pkg.name,
         path: componentDir,
-        importPath: pkg.name
+        importPath: pkg.name,
+        sourcePath // 添加源文件路径
       }
     } catch (error) {
       console.warn(chalk.yellow(`警告: 无法读取组件 "${component}" 的 package.json 文件`))
@@ -743,7 +788,7 @@ export default {
   }
 
   public async start() {
-    const { component, mode = 'playground', vueVersion = '3', watch, all, last } = this.options
+    const { component, mode = 'playground', vueVersion = '3', watch, all, last, sync, vueVersions } = this.options
 
     try {
       let selectedComponent = component
@@ -763,6 +808,30 @@ export default {
           console.log(chalk.yellow('❌ 已取消组件选择'))
           return
         }
+      }
+
+      // Handle sync development
+      if (sync) {
+        await this.setupSyncDevelopment(selectedComponent)
+        
+        // Save development history if component specified
+        if (selectedComponent) {
+          this.saveDevHistory(selectedComponent)
+        }
+        
+        // Print status
+        console.log(chalk.green('\n✨ 同步开发服务器已启动!'))
+        if (selectedComponent) {
+          console.log(chalk.blue(`📝 正在开发组件: ${selectedComponent}`))
+        } else if (all) {
+          console.log(chalk.blue('📝 正在开发所有组件'))
+        }
+        console.log(chalk.blue(`🎯 Vue 版本: ${vueVersions ? vueVersions.join(', ') : '2, 3'}`))
+        if (watch) {
+          console.log(chalk.yellow('👀 监听模式已启用'))
+        }
+        
+        return
       }
 
       if (mode === 'playground') {
@@ -814,6 +883,189 @@ export default {
       console.error(chalk.red('\n❌ 启动开发服务器失败:'), error)
       process.exit(1)
     }
+  }
+
+  // Handle synchronized development across multiple Vue versions
+  private async setupSyncDevelopment(component?: string) {
+    console.log(chalk.blue('🔄 设置多版本同步开发...'))
+    
+    // Determine which Vue versions to use
+    const versions = this.options.vueVersions || ['2', '3']
+    
+    // Create a playground for each version
+    for (const version of versions) {
+      console.log(chalk.blue(`📦 为 Vue ${version} 创建同步预览环境...`))
+      
+      // Setup specific version playground
+      const versionPlaygroundDir = path.join(this.cwd, '.dev', `playground-vue${version}`)
+      
+      // Ensure directory exists
+      await fs.ensureDir(versionPlaygroundDir)
+      
+      // Copy template files
+      const config = PLAYGROUND_CONFIGS[version]
+      if (!config) {
+        throw new Error(`Unsupported Vue version: ${version}`)
+      }
+      
+      const templatePath = path.join(this.templateDir, config.template)
+      if (!fs.existsSync(templatePath)) {
+        throw new Error(`Template directory not found: ${templatePath}`)
+      }
+      
+      await fs.copy(templatePath, versionPlaygroundDir, { overwrite: true })
+      
+      // Update package.json with correct dependencies
+      const pkgPath = path.join(versionPlaygroundDir, 'package.json')
+      const pkg = await fs.readJson(pkgPath)
+      
+      // Ensure dependencies and devDependencies objects exist
+      if (!pkg.dependencies) {
+        pkg.dependencies = {}
+      }
+      if (!pkg.devDependencies) {
+        pkg.devDependencies = {}
+      }
+      
+      // Merge dependencies from config
+      pkg.dependencies = { ...pkg.dependencies, ...config.dependencies }
+      pkg.devDependencies = { ...pkg.devDependencies, ...config.devDependencies }
+      
+      // Customize dev server port based on Vue version
+      const portMap: Record<string, number> = {
+        '2': 5173,
+        '2.7': 5174,
+        '3': 5175
+      }
+      
+      // Add custom dev port
+      pkg.scripts = pkg.scripts || {}
+      pkg.scripts.dev = `vite --port ${portMap[version]}`
+      
+      await fs.writeJson(pkgPath, pkg, { spaces: 2 })
+      
+      // Install dependencies if needed
+      const nodeModulesPath = path.join(versionPlaygroundDir, 'node_modules')
+      if (!fs.existsSync(nodeModulesPath)) {
+        console.log(chalk.yellow(`🗑️ 为 Vue ${version} 安装依赖...`))
+        try {
+          await this.installDependencies(versionPlaygroundDir)
+        } catch (error) {
+          console.error(chalk.red(`安装 Vue ${version} 依赖失败，尝试重新安装...`))
+          // 强制重新安装
+          await fs.remove(nodeModulesPath)
+          await this.installDependencies(versionPlaygroundDir)
+        }
+      }
+      
+      // Link the component to this playground
+      if (component) {
+        await this.linkComponent(component, versionPlaygroundDir)
+      } else {
+        await this.linkComponent('', versionPlaygroundDir)
+      }
+      
+      // Create sync index file
+      await this.createSyncIndexFile(versionPlaygroundDir, version, versions, portMap)
+    }
+    
+    // Start dev servers
+    await this.startSyncServers(versions)
+  }
+  
+  // Create the sync index file for navigation between versions
+  private async createSyncIndexFile(playgroundDir: string, currentVersion: string, allVersions: string[], portMap: Record<string, number>) {
+    const syncIndexPath = path.join(playgroundDir, 'public', 'sync-control.js')
+    await fs.ensureDir(path.join(playgroundDir, 'public'))
+    
+    const syncScript = `
+// Sync Control Panel
+window.addEventListener('DOMContentLoaded', () => {
+  // Create sync control panel
+  const syncControl = document.createElement('div');
+  syncControl.style.position = 'fixed';
+  syncControl.style.top = '10px';
+  syncControl.style.right = '10px';
+  syncControl.style.padding = '10px';
+  syncControl.style.background = '#f0f0f0';
+  syncControl.style.border = '1px solid #ccc';
+  syncControl.style.borderRadius = '4px';
+  syncControl.style.zIndex = '9999';
+  
+  // Add version indicator
+  const versionIndicator = document.createElement('div');
+  versionIndicator.innerText = 'Vue ${currentVersion}';
+  versionIndicator.style.fontWeight = 'bold';
+  versionIndicator.style.marginBottom = '8px';
+  syncControl.appendChild(versionIndicator);
+  
+  // Add links to other versions
+  const linkContainer = document.createElement('div');
+  linkContainer.style.display = 'flex';
+  linkContainer.style.gap = '8px';
+  
+  ${allVersions.map(version => {
+    if (version === currentVersion) return '';
+    return `
+    const link${version.replace('.', '_')} = document.createElement('a');
+    link${version.replace('.', '_')}.innerText = 'Vue ${version}';
+    link${version.replace('.', '_')}.href = 'http://localhost:${portMap[version]}';
+    link${version.replace('.', '_')}.target = '_blank';
+    link${version.replace('.', '_')}.style.textDecoration = 'none';
+    link${version.replace('.', '_')}.style.color = '#0066cc';
+    linkContainer.appendChild(link${version.replace('.', '_')});
+    `;
+  }).join('')}
+  
+  syncControl.appendChild(linkContainer);
+  document.body.appendChild(syncControl);
+  
+  // Listen for route changes to sync
+  window.addEventListener('popstate', () => {
+    const currentPath = window.location.pathname + window.location.search;
+    localStorage.setItem('sync_path', currentPath);
+  });
+  
+  // Check if there's a synced path
+  const syncedPath = localStorage.getItem('sync_path');
+  if (syncedPath && window.location.pathname !== syncedPath) {
+    history.pushState({}, '', syncedPath);
+  }
+});
+    `;
+    
+    await fs.writeFile(syncIndexPath, syncScript);
+    
+    // Modify the main index.html to include this script
+    const indexPath = path.join(playgroundDir, 'index.html');
+    let indexContent = await fs.readFile(indexPath, 'utf-8');
+    
+    // Add script only if not already present
+    if (!indexContent.includes('sync-control.js')) {
+      indexContent = indexContent.replace(
+        '</head>',
+        '  <script src="/sync-control.js"></script>\n  </head>'
+      );
+      await fs.writeFile(indexPath, indexContent);
+    }
+  }
+  
+  // Start development servers for each Vue version
+  private async startSyncServers(versions: string[]) {
+    // Create and start all servers concurrently
+    await Promise.all(versions.map(async version => {
+      const versionPlaygroundDir = path.join(this.cwd, '.dev', `playground-vue${version}`);
+      console.log(chalk.blue(`🚀 启动 Vue ${version} 开发服务器...`));
+      
+      // Create server
+      const server = await this.createDevServer(versionPlaygroundDir);
+      this.syncServers.set(version, server);
+      
+      // Start server
+      await server.listen();
+      console.log(chalk.green(`✅ Vue ${version} 服务器已启动`));
+      server.printUrls();
+    }));
   }
 }
 
