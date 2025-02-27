@@ -6,7 +6,7 @@
   "peerDependencies": {
     "@vue/composition-api": "^1.7.0",
     "vue": "^2.5.0 || ^3.0.0",
-    "vue-demi": "latest"
+    "vue-demi": "0.14.10"
   },
   "scripts": {},
   "exports": {

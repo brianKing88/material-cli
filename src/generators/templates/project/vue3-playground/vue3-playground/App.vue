@@ -1,10 +1,10 @@
 <script lang="ts">
 import { defineComponent, isVue2, isVue3, ref } from 'vue-demi';
-console.log('Button', Button);
+import Button from '../packages/Button/src/Button.vue'
 export default defineComponent({
   name: 'App',
   components: {
-    VButton: Button,  // 注册时的 key 为 "Button"
+    VButton: Button,
   },
   setup() {
     const vueVersion = ref(isVue2 ? 'Vue2' : 'Vue3');

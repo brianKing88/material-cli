@@ -1,16 +1,25 @@
 <script lang="ts">
 import { defineComponent, isVue2, isVue3, ref } from 'vue-demi';
-
+import Button from '../packages/Button/src/Button.vue'
 export default defineComponent({
   name: 'App',
+  components: {
+    VButton: Button,
+  },
   setup() {
-    const versionStr = isVue2 ? 'Vue2' : 'Vue3';
-    const Vue2Version = ref(versionStr);
-
+    const vueVersion = ref(isVue2 ? 'Vue2' : 'Vue3');
     console.warn(`Vue env: Vue3:${isVue3} -- Vue2: ${isVue2}`);
-
+    const handleClick = (event: MouseEvent) => {
+      console.log('App.vue handleClick triggered!', event);
+      console.log('Event details:', {
+        type: event?.type,
+        target: event?.target,
+        currentTarget: event?.currentTarget
+      });
+    }
     return {
-      Vue2Version,
+      vueVersion,
+      handleClick,
     };
   },
 });
@@ -18,13 +27,21 @@ export default defineComponent({
 
 <template>
   <div>
-    <span>{{ Vue2Version }}</span>
-    <vue-demi-template-component />
+    <span>{{ vueVersion }}</span>
+    <h2>Button 组件示例</h2>
+    <div class="demo-button">
+      <v-button type="primary" @click="handleClick">主要按钮</v-button>
+      <v-button>默认按钮</v-button>
+      <v-button type="success">成功按钮</v-button>
+      <v-button type="warning">警告按钮</v-button>
+      <v-button type="danger">危险按钮</v-button>
+      <v-button type="info">信息按钮</v-button>
+    </div>
   </div>
 </template>
 
 <style>
-body > div {
+body>div {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

@@ -1,23 +1,16 @@
 <script lang="ts">
 import { defineComponent, isVue2, isVue3, ref } from 'vue-demi';
-import Vue from 'vue';
-console.log('VButton', VButton);
+import VButton from '../packages/Button/src/Button.vue'
+
 export default defineComponent({
   name: 'App',
   components: {
-    VButton
+    VButton: VButton,
   },
-  data() {
-    return {
-      Vue2Version: isVue2 ? 'Vue2' : 'Vue3'
-    }
-  },
-  created() {
+  setup() {
+    const vueVersion = ref(isVue2 ? 'Vue2' : 'Vue3');
     console.warn(`Vue env: Vue3:${isVue3} -- Vue2: ${isVue2}`);
-    console.log('Vue', Vue);
-  },
-  methods: {
-    handleClick(event: MouseEvent) {
+    const handleClick = (event: MouseEvent) => {
       console.log('App.vue handleClick triggered!', event);
       console.log('Event details:', {
         type: event?.type,
@@ -25,17 +18,17 @@ export default defineComponent({
         currentTarget: event?.currentTarget
       });
     }
+    return {
+      vueVersion,
+      handleClick,
+    };
   },
-  mounted() {
-    console.log('App mounted - available methods:', this.handleClick);
-    console.log('App mounted - components:', this.$options.components);
-  }
 });
 </script>
 
 <template>
   <div>
-    <h1>Vue2Version</h1>
+    <span>{{ vueVersion }}</span>
     <h2>Button 组件示例</h2>
     <div class="demo-button">
       <v-button type="primary" @click="handleClick">主要按钮</v-button>

@@ -10,6 +10,7 @@ Material CLI 是一个用于构建 Vue 组件库的命令行工具，支持同�
 - 自动生成类型声明文件
 - 支持 CSS/LESS/SASS 样式处理
 - 支持组件按需加载
+- 提供灵活的开发环境，支持组件独立开发和 playground 模式
 
 ## 安装
 
@@ -72,22 +73,41 @@ packages/button/
 ### 3. 开发模式
 
 ```bash
-# 启动开发服务器
+# 启动开发服务器（交互式选择组件）
 material dev
 
 # 指定组件开发
 material dev button
 
+# 指定 Vue 版本
+material dev --vue-version 2
+material dev --vue-version 2.7
+material dev --vue-version 3
+
+# 使用上次开发的组件
+material dev --last
+
+# 开发所有组件
+material dev --all
+
+# 选择开发模式
+material dev --mode playground  # 默认
+material dev --mode docs        # 文档站点模式
+
 # 监听模式
 material dev --watch
 ```
 
-开发服务器支持：
+开发服务器提供以下功能：
 
-- 热更新
-- TypeScript 实时编译
-- 样式热重载
-- 组件预览
+- **交互式组件选择**：如果不指定组件，会提供交互式界面选择要开发的组件
+- **历史记录**：记住最近开发的组件，可以使用 `--last` 快速恢复上次的开发环境
+- **多 Vue 版本支持**：可以指定 Vue 2、Vue 2.7 或 Vue 3 版本进行开发
+- **Playground 模式**：自动创建一个独立的开发环境，链接到组件源码
+- **组件独立开发**：每个组件可以有自己的开发环境（demo 目录）
+- **自动创建开发环境**：如果组件没有开发环境，会自动创建一个基础的开发环境
+- **热更新**：支持组件代码和样式的热重载
+- **TypeScript 支持**：完整的 TypeScript 类型支持
 
 ### 4. 构建项目
 
@@ -156,6 +176,27 @@ export default defineConfig({
 })
 ```
 
+## 开发工作流
+
+### 组件开发流程
+
+1. **创建组件**：使用 `material add` 命令创建新组件
+2. **开发组件**：使用 `material dev` 命令启动开发环境
+   - 可以在组件的 `demo` 目录中开发和测试组件
+   - 或使用 playground 模式进行多组件联合开发
+3. **构建组件**：使用 `material build` 命令构建组件
+4. **测试组件**：编写和运行测试用例
+5. **发布组件**：更新版本号并发布到 npm
+
+### Playground 开发
+
+Playground 模式提供了一个完整的 Vue 应用环境，用于开发和测试组件：
+
+- 自动链接到本地组件源码
+- 支持热更新
+- 可以同时测试多个组件的交互
+- 为不同 Vue 版本提供独立的 playground 环境
+
 ## 最佳实践
 
 1. 使用 TypeScript 编写组件
@@ -163,6 +204,8 @@ export default defineConfig({
 3. 添加完整的组件文档
 4. 使用语义化版本号
 5. 遵循组件目录结构规范
+6. 利用 playground 模式测试组件间交互
+7. 使用 `--last` 选项快速恢复开发环境
 
 ## 常见问题
 
@@ -179,6 +222,10 @@ export default defineConfig({
 
    - 检查预处理器配置
    - 确保样式文件正确导入
+4. **开发环境问题**
+   - 检查 Vue 版本兼容性
+   - 确保组件正确链接到 playground
+   - 尝试删除 node_modules 并重新安装依赖
 
 ## 许可证
 
