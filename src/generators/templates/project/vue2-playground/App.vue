@@ -1,8 +1,6 @@
 <script lang="ts">
 import { defineComponent, isVue2, isVue3, ref } from 'vue-demi';
 import Vue from 'vue';
-import VButton from '@martirel-ui/button'
-
 console.log('VButton', VButton);
 export default defineComponent({
   name: 'App',

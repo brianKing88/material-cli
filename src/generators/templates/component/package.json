@@ -8,10 +8,7 @@
   "scripts": {
     "build": "material build"
   },
-  "dependencies": {
-    "@martirel-ui/hooks": "workspace:*",
-    "@martirel-ui/utils": "workspace:*"
-  },
+  "dependencies": {},
   "peerDependencies": {
     "@vue/composition-api": "^1.7.0",
     "vue": "^2.5.0 || ^3.0.0",

@@ -1,16 +1,17 @@
 {
-  "name": "<%= packageName %>",
+  "name": "<%= projectName %>",
   "version": "1.0.0",
-  "description": "<%= ComponentName %> component for Material UI",
+  "description": "Vue component library",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "material build"
   },
-  "dependencies": {
-    "@martirel-ui/hooks": "workspace:*",
-    "@martirel-ui/utils": "workspace:*"
+  "dependencies": {},
+  "devDependencies": {
+    "unocss": "^0.58.0",
+    "vite-plugin-dts": "^3.6.4"
   },
   "peerDependencies": {
     "@vue/composition-api": "^1.7.0",

@@ -6,8 +6,10 @@ import { createViteConfig } from '../config/vite.config'
 import type { BuildOptions, MaterialConfig, ComponentConfig } from '../types'
 import chalk from 'chalk'
 import { createJiti } from "jiti";
-
-
+import { execSync } from 'child_process'
+import { Command } from 'commander'
+import ora from 'ora'
+import { getPackagesDir } from '../utils/paths'
 
 export async function build(options: BuildOptions) {
   console.log(chalk.blue('🔍 Searching for component configurations...'));
@@ -443,24 +445,108 @@ module.exports = isVue2 ? require('./v2/index.js') : require('./v3/index.js')
 
   const indexMjs = `
 import { isVue2 } from 'vue-demi';
-console.log('index.mjs (ESM)', isVue2);
 
-let mod;
-if (isVue2) {
-  mod = await import('./v2/index.mjs');
-  await import('./v2/style.css');
-} else {
-  mod = await import('./v3/index.mjs');
+// 动态导入函数，避免使用顶级 await
+function loadModule() {
+  if (isVue2) {
+    return import('./v2/index.mjs').then(mod => {
+      import('./v2/style.css');
+      return mod.default;
+    });
+  } else {
+    return import('./v3/index.mjs').then(mod => mod.default);
+  }
 }
-export default mod.default;
+
+// 导出一个包装后的组件
+const component = {
+  install: (...args) => {
+    loadModule().then(mod => {
+      if (mod && mod.install) {
+        mod.install(...args);
+      }
+    });
+  }
+};
+
+export default component;
 `
 
   await fs.writeFile(path.join(componentDir, 'dist/index.js'), indexJs)
   await fs.writeFile(path.join(componentDir, 'dist/index.mjs'), indexMjs)
 
-  // Copy types
-  await fs.copy(
-    path.join(componentDir, 'dist/v3/types'),
-    path.join(componentDir, 'dist/types')
-  )
+  // 创建types目录
+  await fs.ensureDir(path.join(componentDir, 'dist/types'))
+  
+  // 查找所有生成的.d.ts文件
+  const v3TypeFiles = await glob('dist/v3/**/*.d.ts', {
+    cwd: componentDir,
+    absolute: false
+  })
+  
+  // 如果找到了类型文件，复制到dist/types目录
+  if (v3TypeFiles.length > 0) {
+    for (const typeFile of v3TypeFiles) {
+      const fileName = path.basename(typeFile)
+      const sourceFile = path.join(componentDir, typeFile)
+      const targetFile = path.join(componentDir, 'dist/types', fileName)
+      
+      try {
+        await fs.copy(sourceFile, targetFile)
+        console.log(chalk.green(`✅ Copied type file: ${fileName}`))
+      } catch (error) {
+        console.warn(chalk.yellow(`⚠️ Failed to copy type file ${fileName}: ${error}`))
+      }
+    }
+  } else {
+    console.warn(chalk.yellow(`⚠️ No type declaration files found in dist/v3`))
+    
+    // 尝试在其他位置查找类型文件
+    const allTypeFiles = await glob('dist/**/*.d.ts', {
+      cwd: componentDir,
+      absolute: false,
+      ignore: ['dist/types/**']
+    })
+    
+    if (allTypeFiles.length > 0) {
+      console.log(chalk.blue(`📝 Found ${allTypeFiles.length} type files in other locations`))
+      for (const typeFile of allTypeFiles) {
+        const fileName = path.basename(typeFile)
+        const sourceFile = path.join(componentDir, typeFile)
+        const targetFile = path.join(componentDir, 'dist/types', fileName)
+        
+        try {
+          await fs.copy(sourceFile, targetFile)
+          console.log(chalk.green(`✅ Copied type file from alternate location: ${fileName}`))
+        } catch (error) {
+          console.warn(chalk.yellow(`⚠️ Failed to copy type file ${fileName}: ${error}`))
+        }
+      }
+    } else {
+      // 如果没有找到任何类型文件，创建一个基本的index.d.ts
+      const basicDts = `
+import { DefineComponent } from 'vue-demi'
+
+declare const component: DefineComponent<{}, {}, any>
+export default component
+`
+      await fs.writeFile(path.join(componentDir, 'dist/types/index.d.ts'), basicDts)
+      console.log(chalk.blue(`📝 Created basic index.d.ts file`))
+    }
+  }
+}
+
+export function registerBuildCommand(program: Command) {
+  program
+    .command('build')
+    .description('Build all components for Vue 2 and Vue 3')
+    .option('--watch', 'Watch mode')
+    .action(async (options) => {
+      try {
+        await build(options);
+      } catch (error: any) {
+        console.error(chalk.red(`Error building components: ${error.message}`));
+        process.exit(1);
+      }
+    });
 } 

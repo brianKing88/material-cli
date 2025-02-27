@@ -1,8 +1,11 @@
 import { cac } from 'cac';
 import { build } from './commands/build';
+import { dev } from './commands/dev';
 import { version } from '../package.json';
 import path from 'path';
 import { createEnv } from 'yeoman-environment';
+import fs from 'fs-extra';
+import chalk from 'chalk';
 
 const cli = cac('material');
 
@@ -47,6 +50,22 @@ cli
 
     // Run the generator with options
     await env.run('material:component', { componentName });
+  });
+
+cli
+  .command('dev [component]', 'Start development server')
+  .option('--vue <version>', 'Vue version to use (2, 2.7, or 3)', { default: '3' })
+  .option('--watch', 'Enable watch mode')
+  .option('--all', 'Develop all components in playground mode')
+  .option('--last', 'Develop the last component you worked on')
+  .action(async (component: string | undefined, options: { vue: string, watch: boolean, all: boolean, last: boolean }) => {
+    await dev({
+      component,
+      vueVersion: options.vue as '2' | '2.7' | '3',
+      watch: options.watch,
+      all: options.all,
+      last: options.last
+    });
   });
 
 cli

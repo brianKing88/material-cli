@@ -1,5 +1,6 @@
 // import type Generator from 'yeoman-generator';
 import path from 'path';
+import chalk from 'chalk';
 
 const Generator = require('yeoman-generator');
 

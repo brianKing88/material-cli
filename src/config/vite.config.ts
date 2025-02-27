@@ -190,8 +190,14 @@ export async function createViteConfig(options: CreateViteConfigOptions): Promis
             currentDir: process.cwd(),
             root
           });
+          
+          // 提取文件名，忽略路径
+          const fileName = filePath.split('/').pop();
+          // 构建新的文件路径，确保类型声明文件直接放在types目录下
+          const newFilePath = `${outDir}/types/${fileName}`;
+          
           return {
-            filePath: filePath.replace(`${outDir}/types`, `${outDir}/types`),
+            filePath: newFilePath,
             content
           };
         },

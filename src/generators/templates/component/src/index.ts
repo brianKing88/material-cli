@@ -1,4 +1,4 @@
-import { withInstall } from '@martirel-ui/utils'
+import { withInstall } from '../../../src/utils'
 import <%= ComponentName %> from './<%= ComponentName %>.vue'
 
 export const <%= ComponentName %> = withInstall(<%= ComponentName %>)
